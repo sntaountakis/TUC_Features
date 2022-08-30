@@ -1,7 +1,8 @@
 import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
-
+from skimage.measure import ransac
+from skimage.transform import FundamentalMatrixTransform
 
 def displayVideo():
     
@@ -27,17 +28,18 @@ def displayVideo():
         kp = corners_to_keypoints(corners)
         kp, des = orb.compute(frame, kp)
         
-        # Test
-        kp, des = orb.detectAndCompute(frame, None)
-        
         # Match frame to frame features
         if prev_des is not None:
             matches = bf.match(des, prev_des)
             matches = sorted(matches, key = lambda x:x.distance)
 
+            # Filter matches with Fundamental Matrix
+            matches = fundamental_matrix(prev_kp, kp, matches)
+
             # Draw features and matches on image
             matched_frame = cv.drawMatches(frame, kp, prev_frame, 
-                            prev_kp, matches, None)
+                            prev_kp, matches, None,
+                            flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
             '''
             for keypoint in kp:
                 x, y = keypoint.pt
@@ -45,17 +47,10 @@ def displayVideo():
             ''' 
             cv.imshow('frame', matched_frame)
 
-
-        # Display video frame
-        #if matched_frame is None:
-        #    matched_frame = frame
-        
-        
         # Wait for q key from user to exit video
         if cv.waitKey(1) & 0xFF == ord('q'):
             break
-        
-       
+               
         prev_frame = frame.copy()
         prev_des = des.copy()
         prev_kp = kp
@@ -71,6 +66,19 @@ def corners_to_keypoints(corners):
 
 	return keypoints
 
+def fundamental_matrix(prev_kp, kp, matches):
+    ret = []
+    for m in matches:
+        kp1 = prev_kp[m.trainIdx].pt
+        kp2 = kp[m.queryIdx].pt
+        ret.append([kp1, kp2])
+
+    ret = np.array(ret)
+    model, inliers = ransac((ret[:, 0], ret[:, 1]),
+                            FundamentalMatrixTransform, min_samples=8,
+                            residual_threshold=1, max_trials=100)
+    matches = np.array(matches)
+    return matches[inliers]
 
 if __name__ == '__main__':
     displayVideo()
