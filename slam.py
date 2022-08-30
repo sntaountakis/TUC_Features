@@ -2,11 +2,12 @@ import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def displayVideo():
     
     #Initialize Capture and Feature objects
     cap = cv.VideoCapture('drive.mp4')
-    orb = cv.ORB_create(100)
+    orb = cv.ORB_create()
     bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
 
     prev_frame = None
@@ -19,10 +20,12 @@ def displayVideo():
         if frame is None:
             break
         
-        # Detect frame features
-        kp, des = orb.detectAndCompute(frame, None)
-
-
+        # Detect good features with Shi-Tomasi Corner Detector
+        gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+        corners = cv.goodFeaturesToTrack(gray_frame, 1000, 0.01, 3) 
+        kp = corners_to_keypoints(corners)
+        kp, des = orb.compute(frame, kp)
+        
         # Match frame to frame features
         if prev_des is not None:
             matches = bf.match(des, prev_des)
@@ -51,8 +54,13 @@ def displayVideo():
     cap.release()
     cv.destroyAllWindows()
 
+def corners_to_keypoints(corners):
+	if corners is None: 
+		keypoints = []
+	else:
+		keypoints = [cv.KeyPoint(kp[0][0], kp[0][1], 20) for kp in corners]
 
-    
+	return keypoints
 
 
 if __name__ == '__main__':
