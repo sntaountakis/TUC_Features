@@ -13,6 +13,7 @@ def displayVideo():
     prev_frame = None
     prev_des = None
     prev_kp = None
+    matched_frame = None
     while(cap.isOpened()):
 
         # Read every video frame with cap.read()
@@ -26,22 +27,30 @@ def displayVideo():
         kp = corners_to_keypoints(corners)
         kp, des = orb.compute(frame, kp)
         
+        # Test
+        kp, des = orb.detectAndCompute(frame, None)
+        
         # Match frame to frame features
         if prev_des is not None:
             matches = bf.match(des, prev_des)
             matches = sorted(matches, key = lambda x:x.distance)
 
             # Draw features and matches on image
+            matched_frame = cv.drawMatches(frame, kp, prev_frame, 
+                            prev_kp, matches, None)
+            '''
             for keypoint in kp:
                 x, y = keypoint.pt
                 cv.circle(frame, (int(x), int(y)), radius=2, color=(0, 255, 0))
-                
-
+            ''' 
+            cv.imshow('frame', matched_frame)
 
 
         # Display video frame
-        cv.imshow('frame', frame)
-
+        #if matched_frame is None:
+        #    matched_frame = frame
+        
+        
         # Wait for q key from user to exit video
         if cv.waitKey(1) & 0xFF == ord('q'):
             break
