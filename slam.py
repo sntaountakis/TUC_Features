@@ -2,7 +2,16 @@ import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage.measure import ransac
-from skimage.transform import FundamentalMatrixTransform
+from skimage.transform import FundamentalMatrixTransform, EssentialMatrixTransform
+
+
+
+# Define camera intrinsic matrix K
+F = 90 #or 90?
+WIDTH_CENTER = 1280 // 2
+HEIGHT_CENTER = 720 // 2
+K = np.array([[F, 0, WIDTH_CENTER], [0, F, HEIGHT_CENTER], [0, 0, 1]])
+K_INV = np.linalg.inv(K)
 
 def displayVideo():
     
@@ -66,6 +75,8 @@ def corners_to_keypoints(corners):
 
 	return keypoints
 
+#f_avg = 0
+#f_est = []
 def fundamental_matrix(prev_kp, kp, matches):
     ret = []
     for m in matches:
@@ -74,11 +85,48 @@ def fundamental_matrix(prev_kp, kp, matches):
         ret.append([kp1, kp2])
 
     ret = np.array(ret)
+
+    ret[:, 0, :] = normalize(ret[:, 0, :])
+    ret[:, 1, :] = normalize(ret[:, 1, :])
+
     model, inliers = ransac((ret[:, 0], ret[:, 1]),
-                            FundamentalMatrixTransform, min_samples=8,
+                            EssentialMatrixTransform, min_samples=8,
                             residual_threshold=1, max_trials=100)
     matches = np.array(matches)
+    
+    Rt = getRtMatrix(model.params)
+
+    #s,v,d = np.linalg.svd(model.params)
+    #f_est.append(np.sqrt(2)/((v[0]+v[1])/2))
+    #f_avg = np.median(f_est)
+    print(Rt)
+
     return matches[inliers]
+
+def add_ones(x):
+    return np.concatenate([x, np.ones((x.shape[0], 1))], axis=1)
+
+def normalize(pts):
+    return np.dot(K_INV, add_ones(pts).T).T[:, 0:2]
+
+def decalibrate():
+    return
+
+def getRtMatrix(E):
+	W = np.mat([[0,-1,0],[1,0,0],[0,0,1]],dtype=float)
+	U,d,Vt = np.linalg.svd(E)
+	assert np.linalg.det(U) > 0
+	if np.linalg.det(Vt) < 0:
+		Vt *= -1.0
+	R = np.dot(np.dot(U, W), Vt)
+	if np.sum(R.diagonal()) < 0:
+		R = np.dot(np.dot(U, W.T), Vt)
+	t = U[:, 2]
+	ret = np.eye(4)
+	ret[:3, :3] = R
+	ret[:3, 3] = t
+	return ret
+
 
 if __name__ == '__main__':
     displayVideo()
